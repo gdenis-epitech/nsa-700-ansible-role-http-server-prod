@@ -1,0 +1,83 @@
+---
+- name: "Load app variables"
+  ansible.builtin.include_vars: app.vars.ansible.yaml
+
+- name: "Install package dependencies"
+  become: true
+  ansible.builtin.apt:
+    force: true
+    name:
+      - git
+      - acl
+
+- name: "Obtain app from remote repository"
+  become: true
+  ansible.builtin.git:
+    repo: "http://{{ app_git_host }}:{{ app_git_port }}/nsa-700/laravel-app.git"
+    dest: /var/www/app
+    version: develop
+    force: true
+
+- name: "Set permissions on application"
+  become: true
+  ansible.builtin.file:
+    path: /var/www/app
+    recurse: true
+    owner: www-data
+    group: www-data
+    mode: "0777"
+
+- name: "Update application .env"
+  become: true
+  ansible.builtin.template:
+    src: files/laravel.env.j2
+    dest: /var/www/app/.env
+    owner: www-data
+    group: www-data
+    mode: "0777"
+
+- name: "Update composer dependencies"
+  community.general.composer:
+    command: update
+    working_dir: /var/www/app
+
+- name: "Install composer dependencies"
+  community.general.composer:
+    command: install
+    working_dir: /var/www/app
+    no_dev: false
+
+- name: "Generate app encryption key"
+  ansible.builtin.command:
+    chdir: /var/www/app
+    cmd: "php artisan key:generate"
+  register: out
+  changed_when: out.rc != 0
+
+- name: "Clear artisan config"
+  ansible.builtin.command:
+    chdir: /var/www/app
+    cmd: "php artisan config:clear"
+  register: out
+  changed_when: out.rc != 0
+
+- name: "Cache artisan config"
+  ansible.builtin.command:
+    chdir: /var/www/app
+    cmd: "php artisan config:cache"
+  register: out
+  changed_when: out.rc != 0
+
+- name: "Migrate database"
+  ansible.builtin.command:
+    chdir: /var/www/app
+    cmd: "php artisan migrate"
+  register: out
+  changed_when: out.rc != 0
+
+- name: "Seed database"
+  ansible.builtin.command:
+    chdir: /var/www/app
+    cmd: "php artisan db:seed"
+  register: out
+  changed_when: out.rc != 0

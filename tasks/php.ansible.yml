@@ -1,0 +1,53 @@
+---
+- name: "Load PHP variables"
+  ansible.builtin.include_vars: php.vars.ansible.yaml
+
+- name: "Install package dependencies"
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    force: true
+    package:
+      - ca-certificates
+      - apt-transport-https
+      - software-properties-common
+      - lsb-release
+
+- name: "Get PHP repository file"
+  become: true
+  ansible.builtin.get_url:
+    url: "https://packages.sury.org/php/README.txt"
+    dest: "/tmp/README.txt"
+    mode: "0755"
+
+- name: "Move PHP repository file"
+  become: true
+  ansible.builtin.copy:
+    remote_src: true
+    src: "/tmp/README.txt"
+    dest: "/tmp/sury-php.sh"
+    mode: "0755"
+
+- name: "Add PHP repository file to trusted repositories"
+  become: true
+  ansible.builtin.command:
+    cmd: "/tmp/sury-php.sh"
+  register: out
+  changed_when: out.rc != 0
+
+- name: "Install php and php modules"
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    force: true
+    package:
+      - php{{ http_php_version }}
+      - php{{ http_php_version }}-cli
+      - php{{ http_php_version }}-fpm
+      - php{{ http_php_version }}-mysql
+      - php{{ http_php_version }}-curl
+      - php{{ http_php_version }}-bz2
+      - php{{ http_php_version }}-mbstring
+      - php{{ http_php_version }}-intl
+      - php{{ http_php_version }}-xml
+      - php{{ http_php_version }}-bcmath
